@@ -52,6 +52,7 @@ ObjNative* newNative(NativeFn function) {
     return native;
 }
 
+/*
 //> Methods and Initializers new-bound-method
 ObjBoundMethod* newBoundMethod(Value receiver,
     ObjClosure* method) {
@@ -94,7 +95,6 @@ ObjClosure* newClosure(ObjFunction* function) {
 
 //> Classes and Instances new-instance
 
-/* LLM
 ObjInstance* newInstance(ObjClass* klass) {
     ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
     instance->klass = klass;
@@ -167,6 +167,7 @@ ObjString* copyString(const char* chars, int length) {
     return allocateString(heapChars, length, hash);
 }
 
+/*
 //> Closures new-upvalue
 ObjUpvalue* newUpvalue(Value* slot) {
     ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
@@ -179,6 +180,7 @@ ObjUpvalue* newUpvalue(Value* slot) {
     //< init-next
     return upvalue;
 }
+*/
 
 static void printFunction(ObjFunction* function) {
     if (function->name == NULL) {
@@ -190,43 +192,35 @@ static void printFunction(ObjFunction* function) {
 
 void printObject(Value value) {
     switch (OBJ_TYPE(value)) {
-        //> Methods and Initializers print-bound-method
+    /*
     case OBJ_BOUND_METHOD:
         printFunction(AS_BOUND_METHOD(value)->method->function);
         break;
-        //< Methods and Initializers print-bound-method
-        //> Classes and Instances print-class
     case OBJ_CLASS:
         printf("%s", AS_CLASS(value)->name->chars);
-        break;
-        //< Classes and Instances print-class
-        //> Closures print-closure
-    case OBJ_CLOSURE:
-        printFunction(AS_CLOSURE(value)->function);
-        break;
-        //< Closures print-closure
-        //> Calls and Functions print-function
-    case OBJ_FUNCTION:
-        printFunction(AS_FUNCTION(value));  // added Ch 24.1
         break;
     case OBJ_INSTANCE:
         printf("%s instance",
             AS_INSTANCE(value)->klass->name->chars);
         break;
-        //< Classes and Instances print-instance
-        //> Calls and Functions print-native
-    case OBJ_NATIVE:
-        printf("<native fn>");
+    case OBJ_CLOSURE:
+        printFunction(AS_CLOSURE(value)->function);
         break;
-        //< Calls and Functions print-native
-    case OBJ_STRING:
-        printf("%s", AS_CSTRING(value));
-        break;
-        //> Closures print-upvalue
     case OBJ_UPVALUE:
         printf("upvalue");
         break;
-        //< Closures print-upvalue
+   
+    case OBJ_FUNCTION:
+        printFunction(AS_FUNCTION(value));  // added Ch 24.1
+        break;
+    */
+    case OBJ_NATIVE:
+        printf("<native fn>");
+        break;
+    case OBJ_STRING:
+        printf("%s", AS_CSTRING(value));
+        break;
     }
+    
 }
 //< print-object

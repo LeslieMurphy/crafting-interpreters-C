@@ -28,15 +28,16 @@ static void freeObject(Obj* object) {
     printf("%p free type %d\n", (void*)object, object->type);
     // #endif
     switch (object->type) {
+        /*
         case OBJ_BOUND_METHOD:
             FREE(ObjBoundMethod, object);
             break;
-      /*  case OBJ_CLASS: {
+        case OBJ_CLASS: {
             ObjClass* klass = (ObjClass*)object;
             freeTable(&klass->methods);
             FREE(ObjClass, object);
             break;
-        } */
+        } 
         case OBJ_CLOSURE: {
             ObjClosure* closure = (ObjClosure*)object;
             FREE_ARRAY(ObjUpvalue*, closure->upvalues,
@@ -44,6 +45,16 @@ static void freeObject(Obj* object) {
             FREE(ObjClosure, object);
             break;
         }
+         case OBJ_INSTANCE: {
+            ObjInstance* instance = (ObjInstance*)object;
+            // freeTable(&instance->fields);
+            FREE(ObjInstance, object);
+            break;
+        }
+        case OBJ_UPVALUE:
+            FREE(ObjUpvalue, object);
+            break;
+        */
         case OBJ_FUNCTION: {  // added Ch 24.1 pg 435
             ObjFunction* function = (ObjFunction*)object;
             freeChunk(&function->chunk);
@@ -51,12 +62,7 @@ static void freeObject(Obj* object) {
             break;
         }
 
-        case OBJ_INSTANCE: {
-            ObjInstance* instance = (ObjInstance*)object;
-            // freeTable(&instance->fields);
-            FREE(ObjInstance, object);
-            break;
-        }
+       
         case OBJ_NATIVE:
             FREE(ObjNative, object);
             break;
@@ -67,9 +73,7 @@ static void freeObject(Obj* object) {
             FREE(ObjString, object);
             break;
         }
-        case OBJ_UPVALUE:
-            FREE(ObjUpvalue, object);
-            break;
+        
     }
 }
 

@@ -78,6 +78,9 @@ struct ObjString {
 };
 
 
+
+
+/* not implemented in this repo
 typedef struct ObjUpvalue {
     Obj obj;
     Value* location;
@@ -89,6 +92,7 @@ typedef struct ObjUpvalue {
     //< next-field
 } ObjUpvalue;
 
+
 typedef struct {
     Obj obj;
     ObjFunction* function;
@@ -97,6 +101,7 @@ typedef struct {
     int upvalueCount;
     //< upvalue-fields
 } ObjClosure;
+
 
 typedef struct {
     Obj obj;
@@ -117,6 +122,7 @@ typedef struct {
     Value receiver;
     ObjClosure* method;
 } ObjBoundMethod;
+*/
 
 /*
 //< Methods and Initializers obj-bound-method
