@@ -48,6 +48,9 @@
     <ClCompile Include="native.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="local.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="chunk.h">
@@ -87,6 +90,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="native.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="local.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

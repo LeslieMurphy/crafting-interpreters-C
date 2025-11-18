@@ -6,6 +6,7 @@
 #include "memory.h"
 #include "scanner.h"
 #include "parseRules.h"
+#include "local.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -14,47 +15,14 @@
 // static void initCompiler(Compiler* compiler, FunctionType type) {
 //ObjFunction* compile(const char* source) {
 
-// Ch 22.1 pg 401 local variables
-
-typedef struct {
-    Token name;
-    int depth;  // 0 is a Global, 1 is the first local scope, 2 is the second nested local scope etc.
-    bool isCaptured;   // for Closures
-} Local;
-
-typedef enum {
-    TYPE_FUNCTION,
-    TYPE_INITIALIZER,
-    TYPE_METHOD,
-    TYPE_SCRIPT  // a dummy function used for the main program logic
-} FunctionType;
-
-typedef struct Compiler {
-    struct Compiler* enclosing;  // linked list added Ch 24.4.1 pg 448
-    ObjFunction* function;
-    FunctionType type;
-
-    Local locals[UINT8_COUNT];
-    int localCount;  // count of locals in scope
-    int scopeDepth;
-
-    // LLM Upvalue upvalues[UINT8_COUNT]; // Closures upvalues-array
-        
-} Compiler;
-
+/*
 typedef struct ClassCompiler {
     struct ClassCompiler* enclosing;
-    //> Superclasses has-superclass
     bool hasSuperclass;
-    //< Superclasses has-superclass
 } ClassCompiler;
+*/
 
-typedef struct {
-    Token current;
-    Token previous;
-    bool hadError;
-    bool panicMode;
-} Parser;
+
 
 Parser parser;
 Compiler* current = NULL;
@@ -66,8 +34,8 @@ static void parsePrecedence(Precedence precedence);
 static void consume(TokenType type, const char* message);
 static uint8_t identifierConstant(Token* name);
 static void emitBytes(uint8_t byte1, uint8_t byte2);
-static void declareVariable();
-static void error(const char* message);
+// DELETE ME static void declareVariable();
+// DELETE ME static void error(const char* message);
 static uint8_t makeConstant(Value value);
 static bool check(TokenType type);
 static bool match(TokenType type);
@@ -80,63 +48,26 @@ static uint8_t identifierConstant(Token* name) {
     return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
 }
 
-// local identifiers pg 406 in ch 22.3
-static bool identifiersEqual(Token* a, Token* b) {
-    if (a->length != b->length) return false;
-    return memcmp(a->start, b->start, a->length) == 0;
-}
 
-// Ch 22.3 local vars pg 405
-static void addLocal(Token name) {
-    if (current->localCount == UINT8_COUNT) {
-        error("Too many local variables in function.");
-        return;
-    }
 
-    Local* local = &current->locals[current->localCount++];
-    local->name = name;
-    local->depth = -1; // Ch 22.4.2 pg 411
-    // local->depth = current->scopeDepth;  // Ch 22.3 pg 405 
 
-    //local->isCaptured = false; // for closures
-}
 
 static uint8_t parseVariable(const char* errorMessage) {
     consume(TOKEN_IDENTIFIER, errorMessage);
 
-    // for local var support ch 22.1 pg 404
-    declareVariable();
-    // When we are in a local scope, no need to add variable name to the constants table
-    if (current->scopeDepth > 0) return 0;
-
+    // If we have a global, there is no need to add variable name to the locals lookup table
+    // We late bind globals ...
+    if (current->scopeDepth != 0) { 
+        // for local var support ch 22.1 pg 404 void declareLocalVariable(Compiler* current, Token* localVarToken) 
+        declareLocalVariable(current, &parser.previous);
+    }
+   
     return identifierConstant(&parser.previous);
 }
 
 static void markInitialized() {
     if (current->scopeDepth == 0) return; // if top level function, there are no local vars only global pg 447
     current->locals[current->localCount - 1].depth = current->scopeDepth;
-}
-
-// Ch 22.3 local vars pg 405/406
-// Declare is when var is added to scope; not available for use until fully defined
-static void declareVariable() {
-    // global variables are late bound so we don't keep track of them here
-    if (current->scopeDepth == 0) return;
-
-    Token* name = &parser.previous;
-
-    for (int i = current->localCount - 1; i >= 0; i--) {
-        Local* local = &current->locals[i];
-        if (local->depth != -1 && local->depth < current->scopeDepth) {
-            break;
-        }
-
-        if (identifiersEqual(name, &local->name)) {
-            error("Already a variable with this name in this scope.");
-        }
-    }
-
-    addLocal(*name);
 }
 
 // define is when variable becomes available for use
@@ -165,29 +96,6 @@ static uint8_t argumentList() {
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
     return argCount;
 }
-
-
-// pg 408 - first local var is at slot 0, second at 1 (up the stack) etc.
-// index into the lookup stack will exactly match the slot in the runtime VM stack
-static int resolveLocal(Compiler* compiler, Token* name) {
-    for (int i = compiler->localCount - 1; i >= 0; i--) {
-        Local* local = &compiler->locals[i];
-        if (identifiersEqual(name, &local->name)) {
-            // added pg 411 to distinguish declared vs defined
-            // when we first add a new local we set it's depth to a flag of -1 meaning uninitialized
-            // see markInitialized
-            if (local->depth == -1) {
-                error("Can't read local variable in its own initializer.");
-            }
-            return i;
-        }
-    }
-
-    return -1; // not found, must be Global var
-}
-
-
-
 
 
 
@@ -242,7 +150,7 @@ static void errorAt(Token* token, const char* message) {
     parser.hadError = true;
 }
 
-static void error(const char* message) {
+void error(const char* message) {
     errorAt(&parser.previous, message);
 }
 
