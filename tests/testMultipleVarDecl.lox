@@ -1,0 +1,2 @@
+// Needs my repo enhancement that supports multiple var declarations
+var x = 5, y = 20,  z; z = x * 4 + y * 3; print z;

@@ -1,0 +1,12 @@
+// 40 using RELEASE compile settings is 1.02334e+08 takes 6.9 seconds on i9-12900KF
+//    VM instruction count=3973923383, push=2152541834; pop=662320568
+// 43 using RELEASE compile settings is 4.33494e+08 takes 30 seconds
+//    VM instruction count=20807732974, push=11270855364; pop=3467955504
+fun fib(n) {
+ if (n < 2) return n;
+ return (fib(n-2) + fib(n-1));
+ }
+ 
+var start = clock();
+print fib(43);
+print clock() - start; 

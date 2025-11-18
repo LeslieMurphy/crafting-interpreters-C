@@ -1,0 +1,7 @@
+fun testMultiDecl(name) {
+  var me = 24, you = 10*me;
+  print  me;
+  print  you;
+  print name;
+}
+testMultiDecl("hi");

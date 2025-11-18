@@ -1,0 +1,28 @@
+# Ignore Visual Studio build output folders
+x64/
+**/x64/
+
+# Build artifacts
+*.obj
+*.exe
+*.dll
+*.pdb
+*.lib
+*.ipch
+*.log
+
+# Visual Studio folders
+.vs/
+Debug/
+Release/
+*.vcxproj.user
+*.suo
+*.cache
+*.ilk
+*.idb
+*.tlog
+*.lastbuildstate
+*.opensdf
+*.sdf
+*.db
+*.VC.db

@@ -1,0 +1,2 @@
+// Expected 0 arguments but got 2.
+fun a() {print "a";} a("too", "many");

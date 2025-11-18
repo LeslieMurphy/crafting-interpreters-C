@@ -1,0 +1,2 @@
+// Expected 0 arguments but got 2. with stack trace c->b->a->script
+fun a() { b(); } fun b() { c(); } fun c() { c("too", "many"); } a();

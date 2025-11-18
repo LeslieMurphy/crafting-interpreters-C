@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="CraftingInterpreterC/CraftingInterpreterC.vcxproj" Id="3b801658-6f6f-4776-ba70-fe1cc4407655" />
+</Solution>

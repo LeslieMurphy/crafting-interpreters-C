@@ -1,0 +1,2 @@
+// prints <fn havingFun>
+fun havingFun() {print "yes";}  print havingFun;
