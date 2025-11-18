@@ -1,13 +1,9 @@
 #pragma once
-//> Strings object-h
 #ifndef clox_object_h
 #define clox_object_h
 
 #include "common.h"
 #include "chunk.h"
-
-// #include "table.h"
-
 #include "value.h"
 
 // AS_OBJ is defined in value.h, gets us the (value).as.obj
@@ -43,7 +39,6 @@ typedef enum {
     OBJ_STRING, // introduced Ch 19.2 page 344
     OBJ_UPVALUE
 } ObjType;
-//< obj-type
 
 // introduced Ch 19.2 page 344
 struct Obj {
@@ -83,7 +78,6 @@ struct ObjString {
 };
 
 
-//> Closures obj-upvalue
 typedef struct ObjUpvalue {
     Obj obj;
     Value* location;
@@ -94,8 +88,7 @@ typedef struct ObjUpvalue {
     struct ObjUpvalue* next;
     //< next-field
 } ObjUpvalue;
-//< Closures obj-upvalue
-//> Closures obj-closure
+
 typedef struct {
     Obj obj;
     ObjFunction* function;
@@ -104,8 +97,6 @@ typedef struct {
     int upvalueCount;
     //< upvalue-fields
 } ObjClosure;
-//< Closures obj-closure
-//> Classes and Instances obj-class
 
 typedef struct {
     Obj obj;
@@ -114,17 +105,13 @@ typedef struct {
     // LLM future  Table methods;
     //< Methods and Initializers class-methods
 } ObjClass;
-//< Classes and Instances obj-class
-//> Classes and Instances obj-instance
 
 typedef struct {
     Obj obj;
     ObjClass* klass;
     // LLM future Table fields; // [fields]
 } ObjInstance;
-//< Classes and Instances obj-instance
 
-//> Methods and Initializers obj-bound-method
 typedef struct {
     Obj obj;
     Value receiver;
@@ -143,26 +130,12 @@ ObjClass* newClass(ObjString* name);
 //> Closures new-closure-h
 ObjClosure* newClosure(ObjFunction* function);
 //< Closures new-closure-h
-//> Calls and Functions new-function-h
-ObjFunction* newFunction();
-//< Calls and Functions new-function-h
 //> Classes and Instances new-instance-h
 ObjInstance* newInstance(ObjClass* klass);
 //< Classes and Instances new-instance-h
-//> Calls and Functions new-native-h
-ObjNative* newNative(NativeFn function);
-//< Calls and Functions new-native-h
-//> take-string-h
-ObjString* takeString(char* chars, int length);
-//< take-string-h
-//> copy-string-h
-ObjString* copyString(const char* chars, int length);
 //> Closures new-upvalue-h
 ObjUpvalue* newUpvalue(Value* slot);
 //< Closures new-upvalue-h
-//> print-object-h
-void printObject(Value value);
-//< print-object-h
 */
 
 ObjFunction* newFunction(); // Ch 24.1 pg 434
@@ -171,12 +144,9 @@ ObjString* takeString(char* chars, int length); // ch 19.4.1 page 351 take owner
 ObjString* copyString(const char* chars, int length);
 void printObject(Value value);
 
-//< copy-string-h
-//> is-obj-type
 // introduced Ch 19.2 page 345
 static inline bool isObjType(Value value, ObjType type) {
     return IS_OBJ(value) && AS_OBJ(value)->type == type;
 }
 
-//< is-obj-type
 #endif

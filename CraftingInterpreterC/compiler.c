@@ -769,22 +769,8 @@ static void declaration() {
     //      if (match(TOKEN_FUN)) {
     //    */
     //}
-    //else if (match(TOKEN_FUN)) {
-    //    //< Classes and Instances match-class
-    //    //> Calls and Functions match-fun
-    //    funDeclaration();
-    //    /* Global Variables match-var < Calls and Functions match-fun
-    //      if (match(TOKEN_VAR)) {
-    //    */
-    //}
-    //else if (match(TOKEN_VAR)) {
-    //    //< Calls and Functions match-fun
-    //    //> match-var
-    //    varDeclaration();
-    //}
-    //else {
-    //    statement();
-    //}
+  
+   
 }
 
 // Ch 21.1 pg 383 adds statement, declaration
@@ -804,39 +790,10 @@ static void statement() {
        beginScope();
        block();
        endScope();
-       //< Local Variables parse-block
-       //> parse-expressions-statement
    }
     else {
         expressionStatement(); // Ch 21.1.2 pg 385
     }
-    //else if (match(TOKEN_FOR)) {
-    //    forStatement();
-    //    //< Jumping Back and Forth parse-for
-    //    //> Jumping Back and Forth parse-if
-    //}
-   
-    //else if (match(TOKEN_RETURN)) {
-    //    returnStatement();
-    //    //< Calls and Functions match-return
-    //    //> Jumping Back and Forth parse-while
-    //}
-    //else if (match(TOKEN_WHILE)) {
-    //    whileStatement();
-    //    //< Jumping Back and Forth parse-while
-    //    //> Local Variables parse-block
-    //}
-    //else if (match(TOKEN_LEFT_BRACE)) {
-    //    beginScope();
-    //    block();
-    //    endScope();
-    //    //< Local Variables parse-block
-    //    //> parse-expressions-statement
-    //}
-    //else {
-    //    expressionStatement();
-    //    //< parse-expressions-statement
-    //}
 }
 
 static void binary(bool canAssign) {
@@ -1021,9 +978,6 @@ static void parsePrecedence(Precedence precedence) {
       
     }
 }
-
-
-
 
 
 //void compile(const char* source) {

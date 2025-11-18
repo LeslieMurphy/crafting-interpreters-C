@@ -1,8 +1,6 @@
 #pragma once
-//> Scanning on Demand scanner-h
 #ifndef clox_scanner_h
 #define clox_scanner_h
-//> token-type
 
 typedef enum {
 	// Single-character tokens.
@@ -36,6 +34,4 @@ typedef struct {
 void initScanner(const char* source);
 
 Token scanToken();
-
-
 #endif
