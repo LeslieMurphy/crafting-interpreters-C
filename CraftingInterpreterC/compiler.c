@@ -34,11 +34,10 @@ static void parsePrecedence(Precedence precedence);
 static void consume(TokenType type, const char* message);
 static uint8_t identifierConstant(Token* name);
 static void emitBytes(uint8_t byte1, uint8_t byte2);
-// DELETE ME static void declareVariable();
-// DELETE ME static void error(const char* message);
 static uint8_t makeConstant(Value value);
 static bool check(TokenType type);
 static bool match(TokenType type);
+static bool parseIntSlice(const char* ptr, int len, int* outValue);
 
 // ch 21.2 pg 389
 // take token and and lexeme to chunk constant table as string
@@ -47,10 +46,6 @@ static bool match(TokenType type);
 static uint8_t identifierConstant(Token* name) {
     return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
 }
-
-
-
-
 
 static uint8_t parseVariable(const char* errorMessage) {
     consume(TOKEN_IDENTIFIER, errorMessage);
@@ -368,7 +363,18 @@ static void expression() {
     parsePrecedence(PREC_ASSIGNMENT); // line 1032
 }
 
+static bool consumeInteger(char* message, int* outValue) {
+    bool isNegative = match(TOKEN_MINUS);
+    int value;
+    consume(TOKEN_NUMBER, message);
+    bool isValid = parseIntSlice(parser.previous.start, parser.previous.length, &value);
+    if (!isValid) error(message);
+    *outValue = isNegative ? -value : value;
+}
+
 #define MAXVARSINDECLARE 20
+#define MAXARRAYDIMENSIONS 3
+
 
 // 11/17/25 add support for multiple
 // var x=66, a=33; print a;  print x;
@@ -379,6 +385,37 @@ static void varDeclaration() {
     //   in this case a OP_SET_GLOBAL is generated
     // or can be the slot on the local stack when declaring variables inside of a function
     uint8_t varSlot = parseVariable("Expect variable name.");
+
+    // is this an array declaration?
+    if (match(TOKEN_LEFT_PAREN)) {
+        int dimensions = 0;
+        int lBound, uBound;
+        bool hasUBound = false;
+        do {
+            dimensions++;
+            if (dimensions > MAXARRAYDIMENSIONS)
+                error("Can't define more than 3 array dimensions, sorry.");
+            
+            consumeInteger("Expect integer array bounds", &lBound);
+            
+            printf("Array bound %d dimension is %d\n", dimensions, lBound);
+            if (match(TOKEN_COLON)) {
+                consumeInteger("Expect integer upper array bounds", &uBound);
+                printf("Array bound %d dimension lower bound %d upper %d\n", dimensions, lBound, uBound);
+                if (lBound >= uBound) error("lower bound must be less than upper bound");
+                hasUBound = true;
+            }
+
+            if (!hasUBound && lBound < 1) error("Array cannot have negative or zero size.");
+            
+            
+        } while (match(TOKEN_COMMA));
+
+        consume(TOKEN_RIGHT_PAREN,
+            "Expect ')' after array bounds.");
+    }
+
+
     int numVariablesDefined = 0;
 
     if (match(TOKEN_EQUAL)) {
@@ -782,6 +819,30 @@ static void number(bool canAssign) {
     emitConstant(NUMBER_VAL(value));  // changed in Ch 18
 }
 
+static bool parseIntSlice(const char* ptr, int len, int* outValue) {
+    // if (!ptr || len <= 0 || !outValue) return false;
+
+    int value = 0;
+    int sign = 1;
+    int i = 0;
+
+    if (ptr[0] == '-') {
+        sign = -1;
+        i = 1;
+        if (len == 1) return false;  // Just a minus sign no good
+    }
+
+    for (; i < len; i++) {
+        if (!isdigit((unsigned char)ptr[i])) return false;
+        value = value * 10 + (ptr[i] - '0');
+    }
+
+    *outValue = sign * value;
+    return true;
+}
+
+
+
 // in ch 19.3 page 346
 static void string(bool canAssign) {
     // strip quote marks off literal
@@ -921,3 +982,4 @@ ObjFunction* compile(const char* source) {
 }
 
 #undef MAXVARSINDECLARE
+#undef MAXARRAYDIMENSIONS

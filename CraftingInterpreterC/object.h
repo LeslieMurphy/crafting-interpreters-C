@@ -77,7 +77,20 @@ struct ObjString {
     uint32_t hash; // aded in Ch 20.4.1 pg 367
 };
 
+// Array dimension
+typedef struct ObjArrayDimension {
+    short lBound;
+    short uBound;
+    short offSet;
+} ObjArrayDimension;
 
+// Array
+struct ObjArray {
+    Obj obj;
+    short numDimensions;
+    ObjArrayDimension* dimension;
+    uint32_t hash; // aded in Ch 20.4.1 pg 367
+};
 
 
 /* not implemented in this repo

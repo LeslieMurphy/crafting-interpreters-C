@@ -237,6 +237,7 @@ Token scanToken() {
             //> scan-string
         case '"': return string();
         case '?': return makeToken(TOKEN_RANDOM);
+        case ':': return makeToken(TOKEN_COLON);
     }
 
     return errorToken("Unexpected character.");

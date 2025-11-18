@@ -51,13 +51,7 @@ void writeChunk(Chunk* chunk, uint8_t byte, int line) {
 }
 
 int addConstant(Chunk* chunk, Value value) {
-	////> Garbage Collection add-constant-push
-	//push(value);
-	////< Garbage Collection add-constant-push
 	writeValueArray(&chunk->constants, value);
-	////> Garbage Collection add-constant-pop
-	//pop();
-	////< Garbage Collection add-constant-pop
 	return chunk->constants.count - 1;
 }
 
