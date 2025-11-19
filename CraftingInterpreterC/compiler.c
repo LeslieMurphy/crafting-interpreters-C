@@ -894,7 +894,40 @@ static void namedVariable(Token name, bool canAssign) {
 
 // added in Ch 21.3 pg 391; canAssign added on pg 395
 static void variable(bool canAssign) {
-    namedVariable(parser.previous, canAssign);
+    bool arrayReference = false;
+    Token variableToken = parser.previous;
+    // Is the variable subscripted?  if so it is an array reference
+    
+    if (match(TOKEN_LEFT_PAREN)) {
+        int dimensions = 0;
+        do {
+            dimensions++;
+            if (dimensions > MAXARRAYDIMENSIONS)
+                error("Can't access more than 3 array dimensions, sorry.");
+
+            // the subscript can be an integer (negative is allowed)
+            // or any expression that yields an integer
+            // or the special case of a '*' which means all array elements
+            //   .e.g. A(*) or B(*,*) or MATRIX(5,*) etc.
+            
+            if (match(TOKEN_STAR)) {
+                emitConstant(ARRAY_STAR_VAL);
+            }
+            else {
+                expression();
+            }
+            
+            printf("Array reference has %d dimensions\n", dimensions);
+
+        } while (match(TOKEN_COMMA));
+        consume(TOKEN_RIGHT_PAREN,
+            "Expect ')' after array reference.");
+    }
+
+    namedVariable(variableToken, canAssign);
+    //if (arrayReference) {
+    //    // TODO create VM operation that points to array, and has # of subscripts to POP off stack 
+    //}
 }
 
 

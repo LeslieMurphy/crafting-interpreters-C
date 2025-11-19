@@ -13,6 +13,8 @@ void printValueType(Value value) {
     case VAL_NIL: printf("nil"); break;
     case VAL_NUMBER: printf("NUMBER"); break;
     case VAL_OBJ: printf("OBJECT"); break;
+    case VAL_ARRAY_REF: printf(" *array ref ** "); break;
+    case VAL_ARRAY_STAR: printf("*"); break;
     default:
         printf("UNKNOWN!!");
     }
@@ -28,6 +30,8 @@ void printValue(Value value) {
         case VAL_NIL: printf("nil"); break;
         case VAL_NUMBER: printf("%g", AS_NUMBER(value)); break;
         case VAL_OBJ: printObject(value); break;
+        case VAL_ARRAY_REF: printf(" *array ref ** "); break;
+        case VAL_ARRAY_STAR: printf("*"); break;
     }
 }
 

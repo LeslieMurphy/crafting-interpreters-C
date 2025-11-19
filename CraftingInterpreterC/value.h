@@ -21,7 +21,9 @@ typedef enum {
     VAL_BOOL,
     VAL_NIL, 
     VAL_NUMBER,
-    VAL_OBJ
+    VAL_OBJ,
+    VAL_ARRAY_REF,  // refer to Array variable
+    VAL_ARRAY_STAR  // * as Array subscript = All values
 } ValueType;
 
 
@@ -35,6 +37,7 @@ typedef struct {
         bool boolean;
         double number;
         Obj* obj;
+        // TODO Array* arrayVar;
     } as;
 } Value;
 
@@ -87,6 +90,8 @@ typedef struct {
 #define NIL_VAL           ((Value){VAL_NIL, {.number = 0}})
 #define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
 #define OBJ_VAL(object)   ((Value){VAL_OBJ, {.obj = (Obj*)object}})
+
+#define ARRAY_STAR_VAL           ((Value){VAL_ARRAY_STAR})
 
 static inline double valueToNum(Value value) {
     double num;
