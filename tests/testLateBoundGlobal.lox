@@ -1,0 +1,4 @@
+// From ch 21 - pg 382 - globals are late bound - at runtime
+fun showGlobalVar() { print global; }
+var global = "after";
+showGlobalVar();

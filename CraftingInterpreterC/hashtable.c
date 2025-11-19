@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "memory.h"
@@ -14,6 +15,29 @@ void initTable(Table* table) {
     table->count = 0;
     table->capacity = 0;
     table->entries = NULL;
+}
+
+// string intern 
+void debugPrintTable(Table* table, char* description, bool isStringIntern) {
+    printf("** Dumping contents of table %s\n", description);
+    printf("Count %d capacity %d\n", table->count, table->capacity);
+    for (int i = 0; i < table->capacity; i++) {
+        Entry* entry = &table->entries[i];
+        if (entry->key != NULL) {
+            if (isStringIntern) {
+                // see ch 20.5 page 327
+                printf("String intern entry at slot %i has unique string %.*s.", i, entry->key->length, entry->key->chars);
+            }
+            else {
+                printf("Entry at slot %i has key %.*s.  Value Type:", i, entry->key->length, entry->key->chars);
+                printValueType(entry->value);
+                printf(" Value: ");
+                printValue(entry->value);
+            }
+            
+            printf("\n");
+        }
+    }
 }
 
 void freeTable(Table* table) {

@@ -1,0 +1,11 @@
+// this is a runtime error for d not defined; should catch it at compile time 
+// generates a SET GLOBAL for d, which of course does not exist
+{var a; var b; var c; d = 5;}
+// generates a GET GLOBAL for d, which of course does not exist (in new REPL session)
+{var a; var b; var c; c = d;}
+// This runs OK since a DEFINE GLOBAL was created for d
+var d=8; {var a; var b; var c; d = 5;}
+//  Error at 'a': Already a variable with this name in this scope.
+var a = 7; {var a; var a; var b; var c; a=5; b = 7; c=8; print a;} print a;
+// print 100 and then global 5
+var a = 5; {var a = 100; print a;} print a;

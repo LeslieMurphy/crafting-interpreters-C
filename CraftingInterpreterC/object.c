@@ -210,15 +210,16 @@ void printObject(Value value) {
         printf("upvalue");
         break;
    
-    case OBJ_FUNCTION:
-        printFunction(AS_FUNCTION(value));  // added Ch 24.1
-        break;
+    
     */
     case OBJ_NATIVE:
         printf("<native fn>");
         break;
     case OBJ_STRING:
         printf("%s", AS_CSTRING(value));
+        break;
+    case OBJ_FUNCTION:
+        printFunction(AS_FUNCTION(value));  // added Ch 24.1
         break;
     }
     

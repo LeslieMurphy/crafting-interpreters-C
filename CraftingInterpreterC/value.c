@@ -4,6 +4,20 @@
 #include "memory.h"
 #include "value.h"
 
+
+void printValueType(Value value) {
+    // printf("%g", value); // ch 17
+    //printf("%g", AS_NUMBER(value)); // ch 18
+    switch (value.type) {
+    case VAL_BOOL: printf("BOOL"); break;
+    case VAL_NIL: printf("nil"); break;
+    case VAL_NUMBER: printf("NUMBER"); break;
+    case VAL_OBJ: printf("OBJECT"); break;
+    default:
+        printf("UNKNOWN!!");
+    }
+}
+
 void printValue(Value value) {
     // printf("%g", value); // ch 17
     //printf("%g", AS_NUMBER(value)); // ch 18

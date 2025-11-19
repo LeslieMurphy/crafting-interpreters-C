@@ -73,7 +73,11 @@ void initVM() {
 	////> call-reset-stack
 	resetStack();
 	vm.objects = NULL; // Ch 19.5 page 353
-	initTable(&vm.strings); // Ch 20.5 for String interning
+	
+	// vm.strings is for string interning - a unique place for each string so we can compare equality by a simple pointer compare
+	// this table is more of a hashset - the entries themselves are not used
+	initTable(&vm.strings); // Ch 20.5 used for String interning - unique place for each string so we can compare equality
+
 	initTable(&vm.globals); // ch 21.2 for global vars pg 390
 
 	defineNative("clock", clockNative);
@@ -99,6 +103,10 @@ void initVM() {
 }
 
 void freeVM() {
+	debugPrintTable(&vm.strings, "Strings", true);
+	printf("\n");
+	debugPrintTable(&vm.globals, "Globals", false);
+	printf("\n");
 	freeTable(&vm.strings); // Ch 20.5
 	freeTable(&vm.globals); // ch 21.2
 	//vm.initString = NULL;
@@ -315,6 +323,10 @@ static InterpretResult run() {
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
 	printf("\nExecution VM trace:\n");
+	debugPrintTable(&vm.strings, "Strings", true);
+	printf("\n");
+	debugPrintTable(&vm.globals, "Globals", false);
+	printf("\n");
 
 	for (;;) {
 		vm.instructionCount++;

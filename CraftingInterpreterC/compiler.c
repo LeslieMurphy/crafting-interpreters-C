@@ -305,7 +305,6 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
     //}
 }
 
-// static void endCompiler() prior to Ch 24
 static ObjFunction* endCompiler() {
     emitReturn();
     ObjFunction* function = current->function;
@@ -313,8 +312,6 @@ static ObjFunction* endCompiler() {
 #ifdef DEBUG_PRINT_CODE
     if (!parser.hadError) {
         printf("clean compile! here is the bytecode\n");
-        // disassembleChunk(currentChunk(), "code"); prior to Ch 24
-        //  new logic pg 438
         disassembleChunk(currentChunk(), function->name != NULL
             ? function->name->chars : "<script>");
     }
@@ -352,15 +349,8 @@ static void endScope() {
  
 }
 
-
-//static void statement();
-//static void declaration();
-//
-//static ParseRule* getRule(TokenType type);
-//static void parsePrecedence(Precedence precedence);
-
 static void expression() {
-    parsePrecedence(PREC_ASSIGNMENT); // line 1032
+    parsePrecedence(PREC_ASSIGNMENT); 
 }
 
 static bool consumeInteger(char* message, int* outValue) {
@@ -407,6 +397,9 @@ static void varDeclaration() {
             }
 
             if (!hasUBound && lBound < 1) error("Array cannot have negative or zero size.");
+
+            // Process the array bound.
+            // Need to store this as an extended attribute on the Value object.
             
             
         } while (match(TOKEN_COMMA));

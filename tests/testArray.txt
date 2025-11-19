@@ -1,0 +1,5 @@
+var x(-5:10); x(-5) = 5; print x(-5);
+
+ Error at '=': Invalid assignment target.
+ 
+ 

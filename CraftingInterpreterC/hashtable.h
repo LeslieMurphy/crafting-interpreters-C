@@ -36,4 +36,5 @@ ObjString* tableFindString(Table* table, const char* chars,
 
 void tableRemoveWhite(Table* table);
 // void markTable(Table* table);
+void debugPrintTable(Table* table, char* description, bool isStringIntern);
 #endif
