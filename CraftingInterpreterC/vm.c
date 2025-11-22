@@ -11,6 +11,7 @@
 #include "memory.h"
 #include "vm.h"
 #include "native.h"
+#include "array.h"
 
 VM vm; // [one]
 
@@ -79,7 +80,15 @@ void initVM() {
 	initTable(&vm.strings); // Ch 20.5 used for String interning - unique place for each string so we can compare equality
 
 	initTable(&vm.globals); // ch 21.2 for global vars pg 390
+	initTable(&vm.globalArrayVars); 
+	
+	//typedef struct {
+	//	ArrayVariable* arrayVars[MAXARRAYVARIABLES];
+	//	int arrayVarCount;
+	//} ArrayVariables;
 
+	vm.arrayVarList.arrayVarCount = 0;
+	
 	defineNative("clock", clockNative);
 
 	vm.instructionCount = 0;
@@ -99,7 +108,6 @@ void initVM() {
 	//vm.initString = NULL;
 	//vm.initString = copyString("init", 4);
 
-	//defineNative("clock", clockNative);
 }
 
 void freeVM() {
@@ -109,7 +117,7 @@ void freeVM() {
 	printf("\n");
 	freeTable(&vm.strings); // Ch 20.5
 	freeTable(&vm.globals); // ch 21.2
-	//vm.initString = NULL;
+	freeTable(&vm.globalArrayVars);
 	freeObjects();  // Ch 19.5 
 
 }
@@ -590,13 +598,233 @@ static InterpretResult run() {
 			}
 			break;
 		}
+		case OP_GET_GLOBAL_ARRAY: { // get a value or set of values from an Array element based on subscripts
+			ObjString* name = READ_STRING();
+			Value value = NIL_VAL;
+
+			printf("get global array for %s\n", name->chars);
+			if (!tableGet(&vm.globalArrayVars, name, &value)) {
+				runtimeError("Undefined variable '%s'.", name->chars);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+
+			/*
+			TODO lookup the name in the global strings
+// get the ptr to the definition
+// Confirm subscripts match
+// index into the vars and get the value
+ handle *
+ */
+			ArrayVariable* varDefn;
+			// Value arrayDefinition = { VAL_ARRAY_REF , .as.obj = varDefn };
+			varDefn = (ArrayVariable*) value.as.obj;
+			int dimensions = varDefn->dimensions;
+
+			// int idOfArrayVar = READ_BYTE();
+			int subscriptCount = READ_BYTE();
+			
+			// TODO the subscript can be * or a range such as 5:10
+
+			if (subscriptCount == 0) {
+				runtimeError("array var ref without any subscripts");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+
+			if (subscriptCount != dimensions) {
+				runtimeError("array subscripts do not match array dimensions");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			
+			Value subscripts[MAXARRAYDIMENSIONS];
+
+			for (int i = 0; i < subscriptCount; i++) {
+				Value temp = peek(i - i);
+				subscripts[i] = peek(i - i);
+				printf("Subscript % d is ", i);
+				printValue(subscripts[i]);
+			}
+			printf("\n");
+
+			// TODO optimize so we just do the pops no peeks
+			for (int i = 0; i < subscriptCount; i++) {
+				pop();
+			}
+
+			// varDefn->arrayValues[2] = fake;
+			
+			//value = varDefn->arrayValues[(int) (subscripts[0].as.number - 1) ];  // TODO fix this!
+			//push(value);
+
+
+			// getArrayValue(ArrayVariable* varDefn, Value subscripts[], char* errbuf, size_t errbuf_size);
+			char err_buffer[200];
+			Value* valuePtr;
+			valuePtr = getArrayValue(varDefn, &subscripts, err_buffer, sizeof(err_buffer));
+			if (valuePtr == NULL) {
+				runtimeError(err_buffer);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			push(*valuePtr);
+			
+
+
+			// TODO the bounds are offsets so subtract 1
+			// TODO multiple dimensions?
+			// TODO * get would need to return an array slice
+
+		
+			
+
+			
+			
+			//if (!tableGet(&vm.globals, name, &value)) {
+			//	runtimeError("Undefined variable '%s'.", name->chars);
+			//	return INTERPRET_RUNTIME_ERROR;
+			//}
+			
+			break;
+
+		}
+
+		case OP_SET_GLOBAL_ARRAY: { // Ch 21.4 pg 393
+			// 0004    | OP_SET_GLOBAL_ARRAY    1 Subscripts=1
+			
+			// (frame->function->chunk.constants.values[READ_BYTE()])
+
+			// for globalArrayVars the Value will not be the scalar value
+			//  instead it is a Object that points into our Array struct
+
+			//  READ_STRING  ((ObjString*)(((frame->function->chunk.constants.values[(*frame->ip++)])).as.obj))
+			uint8_t* frame_ip = frame->ip;
+			ObjString* name = READ_STRING();
+			Value value = NIL_VAL;
+
+			printf("set global array for %s\n", name->chars);
+			Value rhs = peek(0);
+
+			// For regular globals, the vm.globals is a dynamic lookup to an entry, and we simply set its Value to the rhs contents
+			// For array globals, we could  have a rhs that is in itself an array, such as B(1:5) or B(*)
+			// 
+			// Initial logic
+			//   globalArrayVars when being defined takes a Value object that is what defines the bounds of the array and the pointer to its storage location as an array of Values
+			//   here in SET (or in GET) we need to pull out the definition, apply index logic, and locate the actual Value(s)
+
+			//if (tableSet(&vm.globalArrayVars, name, peek(0))) {
+			//	tableDelete(&vm.globalArrayVars, name); 
+			//	runtimeError("Undefined global array variable '%s'.", name->chars);
+			//	return INTERPRET_RUNTIME_ERROR;
+			//}
+
+			if (!tableGet(&vm.globalArrayVars, name, &value)) {
+				runtimeError("Undefined global array variable '%s'.", name->chars);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+
+			ArrayVariable* varDefn = (ArrayVariable*)value.as.obj;
+			int dimensions = varDefn->dimensions;
+						
+			uint8_t start_rhs_ip = READ_BYTE(); // new so we can handle star assigment e.g. var a(10); a(*) = 1?100;
+			int subscriptCount = READ_BYTE();
+
+			if (subscriptCount == 0) {
+				runtimeError("array var ref without any subscripts");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+
+			printf("there are %d subscripts.  Rhs ip start is %d\n", subscriptCount, start_rhs_ip);
+
+			
+			if (subscriptCount != dimensions) {
+				runtimeError("array subscripts do not match array dimensions");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+
+			Value subscripts[MAXARRAYDIMENSIONS];
+
+			for (int i = 0; i < subscriptCount; i++) {
+				subscripts[i] = peek(subscriptCount - i);
+				printf("Subscript % d is ", i);
+				printValue(subscripts[i]);
+				printf("\n");
+			}
+
+
+			//varDefn->arrayValues[(int)(subscripts[0].as.number - 1)] = rhs;  // TODO fix this!  hardcoded to first subscript
+			char err_buffer[200];
+			bool success = setArrayValue(varDefn, &rhs, &subscripts, &err_buffer, sizeof(err_buffer));
+			if (!success) {
+				runtimeError(err_buffer);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+
+			
+			// we have trouble here because we need to pop the subscripts but the very top of stack is RH side!
+
+			// TODO optimize so we just do the pops no peeks
+			//for (int i = 0; i < subscriptCount; i++) {
+			//	pop();
+			//}
+
+			break;
+		}
+
+	
 
 		case OP_DEFINE_GLOBAL: { // ch 21.2
 			ObjString* name = READ_STRING();
+			Value rhs = peek(0);  // will be NIL if there is no assignment
 			tableSet(&vm.globals, name, peek(0));
 			pop();
 			break;
 		}
+
+		case OP_DEFINE_GLOBAL_ARRAY: { 
+			ObjString* name = READ_STRING();
+			// Initializer not present set each Array element to nil?
+			Value rhs = peek(0); // TODO handle an initializer on an array.  
+
+			if (vm.arrayVarList.arrayVarCount > MAXARRAYVARIABLES) error("Too many global array variables");
+
+			int subscriptCount = READ_BYTE();
+			int varCount = READ_SHORT(); // TODO support larger arrays
+			printf("Global var %s with subscript count %d total variable count %d\n", name->chars, subscriptCount, varCount);
+			
+			
+			
+			// TODO get the bounds and each bound dimensions from our bytecode 
+			
+			//ArrayVariable* varDefn = allocateArrayVar(bounds);
+			//vm.arrayVarList.arrayVars[vm.arrayVarList.arrayVarCount] = varDefn;
+			
+			ArrayVariable* varDefn = allocateNewArrayVar(&vm.arrayVarList, subscriptCount, varCount);
+			varDefn->variableName = name->chars;
+			varDefn->dimensions = subscriptCount;
+			for (int i = 0; i < subscriptCount; i++) {
+				short lbound = READ_SHORT();
+				short ubound = READ_SHORT();
+				printf("Definition for subscript %d is %d:%d\n", i, lbound, ubound);
+				varDefn->bounds[i].lBound = lbound;
+				varDefn->bounds[i].uBound = ubound;
+			}
+			
+
+
+			Value arrayDefinition = { VAL_ARRAY_REF , .as.obj = varDefn };
+			// the lookup of the global variable name for the array will get us a pointer back to the definition
+			tableSet(&vm.globalArrayVars, name, arrayDefinition); 
+
+			// temp code
+			Value fake2 = { VAL_NUMBER, .as.number = 123 };
+			varDefn->arrayValues[2] = fake2;
+			Value fake3 = { VAL_NUMBER, .as.number = 456 };
+			varDefn->arrayValues[3] = fake3;
+				// varDefn->arrayValues[2];
+			pop();
+			break;
+		}
+
+
+
 
 							 // Ch 22.4.1 pg 409 
 		case OP_GET_LOCAL: {
@@ -726,4 +954,4 @@ InterpretResult interpret(const char* source) {
 #undef READ_CONSTANT
 #undef READ_SHORT
 #undef READ_STRING
-#undef BINARY_OP
+#undef BINARY_OP//////////////////////////

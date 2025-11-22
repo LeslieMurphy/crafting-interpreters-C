@@ -51,6 +51,9 @@
     <ClCompile Include="local.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="array.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="chunk.h">
@@ -93,6 +96,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="local.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="array.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -63,7 +63,7 @@ void testChunks() {
 */
 
 static void repl() {
-    char line[1024];
+    // char line[1024];
     for (;;) {
         printf("> ");
 

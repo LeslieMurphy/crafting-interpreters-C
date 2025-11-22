@@ -2,37 +2,25 @@
 #include <stdlib.h>
 
 #include "chunk.h"
-//> chunk-c-include-memory
 #include "memory.h"
-//< chunk-c-include-memory
+
 //> Garbage Collection chunk-include-vm
-// LES #include "vm.h"
+//  #include "vm.h"
 //< Garbage Collection chunk-include-vm
 
 void initChunk(Chunk* chunk) {
 	chunk->count = 0;
 	chunk->capacity = 0;
 	chunk->code = NULL;
-	//> chunk-null-lines
 	chunk->lines = NULL;
-	//< chunk-null-lines
-	//> chunk-init-constant-array
 	initValueArray(&chunk->constants);
-	//< chunk-init-constant-array
 }
 
-//> free-chunk
 void freeChunk(Chunk* chunk) {
 	FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
-	//> chunk-free-lines
 	FREE_ARRAY(int, chunk->lines, chunk->capacity);
-	//< chunk-free-lines
-	//> chunk-free-constants
-	//freeValueArray(&chunk->constants);
-	//< chunk-free-constants
 	initChunk(chunk);
 }
-//< free-chunk
 
 void writeChunk(Chunk* chunk, uint8_t byte, int line) {
 	//< write-chunk-with-line
@@ -55,6 +43,4 @@ int addConstant(Chunk* chunk, Value value) {
 	return chunk->constants.count - 1;
 }
 
-// more is in https://github.com/munificent/craftinginterpreters/blob/master/c/chunk.c
-
-//< add-constant
+// https://github.com/munificent/craftinginterpreters/blob/master/c/chunk.c

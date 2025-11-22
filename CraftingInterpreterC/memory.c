@@ -9,6 +9,12 @@
 // LLM for logging
 #include <stdio.h>
 
+void* allocate(size_t size) {
+    void* result = malloc(size);
+    if (result == NULL) exit(1);
+    return result;
+}
+
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
     if (newSize == 0) {
         free(pointer);

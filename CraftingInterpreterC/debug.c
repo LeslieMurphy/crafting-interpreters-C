@@ -4,6 +4,14 @@
 #include "debug.h"
 #include "value.h"
 
+#define READ_SHORT() \
+    (frame->ip += 2, \
+    (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+
+#define DEBUG_READ_SHORT() \
+    (offset += 2, \
+    (uint16_t)((chunk->code[offset-2] << 8) | chunk->code[offset-1]))
+
 // Ch 14.5.3
 // The constant index is in the next byte of bytecode
 static int constantInstruction(const char* name, Chunk* chunk, int offset) {
@@ -37,6 +45,50 @@ static int byteInstruction(const char* name, Chunk* chunk, int offset) {
     printf("%-16s %4d\n", name, slot);
     return offset + 2;
 }
+
+static int arrayRefInstruction(const char* name, Chunk* chunk, int offset, bool isSetOperation) {
+    uint8_t constantNameIdx = chunk->code[offset + 1];
+    printf("%-16s %4d '", name, constantNameIdx);
+    printValue(chunk->constants.values[constantNameIdx]);
+
+    if (isSetOperation){
+        uint8_t start_rhs_ip = chunk->code[offset + 2];
+        printf("'  start of RHS ip counter  = % d\n", start_rhs_ip);
+        offset++;
+    }
+
+    // uint8_t slot = chunk->code[offset + 1];
+    uint8_t numSubscripts = chunk->code[offset + 2];
+    printf("' #subscripts = % d\n", numSubscripts);
+    return offset + 3;
+}
+
+static int arrayDefInstruction(const char* name, Chunk* chunk, int offset) {
+    uint8_t constantNameIdx = chunk->code[offset + 1];
+    printf("%-16s %4d '", name, constantNameIdx);
+    printValue(chunk->constants.values[constantNameIdx]);
+
+    // uint8_t slot = chunk->code[offset + 1];
+    uint8_t numSubscripts = chunk->code[offset + 2];
+    offset = offset + 3;
+    short numVars = DEBUG_READ_SHORT();
+    printf("' #subscripts = %d varCount = %d   indices ", numSubscripts, numVars);
+    // offset = offset + 3;
+    for (int i = 0; i < numSubscripts; i++) {
+        printf(" (");
+        short lBound = DEBUG_READ_SHORT();
+        short uBound = DEBUG_READ_SHORT();
+        //uint8_t lBound = chunk->code[offset + 4 + i *4];
+        //uint8_t uBound = chunk->code[offset + 6 + i * 4];
+        printf("%d:%d)  ", lBound, uBound);
+    }
+    printf("\n");
+    //return offset + 3 + numSubscripts * 4;
+    return offset;
+}
+
+
+
 
 // Added in Ch 23.2 pg 420
 static int jumpInstruction(const char* name, int sign,
@@ -83,6 +135,14 @@ int disassembleInstruction(Chunk* chunk, int offset) {
         return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL:
         return constantInstruction("OP_SET_GLOBAL", chunk, offset);
+    
+    case OP_GET_GLOBAL_ARRAY:
+        return arrayRefInstruction("OP_GET_GLOBAL_ARRAY", chunk, offset, false);
+    case OP_SET_GLOBAL_ARRAY:
+        return arrayRefInstruction("OP_SET_GLOBAL_ARRAY", chunk, offset, true);
+    case OP_DEFINE_GLOBAL_ARRAY:
+        return arrayDefInstruction("OP_DEFINE_GLOBAL_ARRAY", chunk, offset);
+    
     case OP_GET_UPVALUE:
         return byteInstruction("OP_GET_UPVALUE", chunk, offset);
     case OP_SET_UPVALUE:
@@ -185,3 +245,5 @@ void disassembleChunk(Chunk* chunk, const char* name) {
         offset = disassembleInstruction(chunk, offset);
     }
 }
+
+#undef DEBUG_READ_SHORT

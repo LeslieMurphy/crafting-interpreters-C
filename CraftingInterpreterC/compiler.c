@@ -33,7 +33,7 @@ static void statement();
 static void parsePrecedence(Precedence precedence);
 static void consume(TokenType type, const char* message);
 static uint8_t identifierConstant(Token* name);
-static void emitBytes(uint8_t byte1, uint8_t byte2);
+static void emitBytes(OpCode byte1, uint8_t byte2);
 static uint8_t makeConstant(Value value);
 static bool check(TokenType type);
 static bool match(TokenType type);
@@ -65,15 +65,16 @@ static void markInitialized() {
     current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
-// define is when variable becomes available for use
-static void defineVariable(uint8_t global) {
+// Emit the VM opcode to define global variable now that it becomes available for use
+// for local just mark it as initialized
+static void defineVariable(OpCode opcode, uint8_t globalVarSlot) {
 
     // if in local scope, the local var is already on top of stack - see pg 404
     if (current->scopeDepth > 0) {
         markInitialized(); // pg 411
         return;
     } 
-    emitBytes(OP_DEFINE_GLOBAL, global); // ch 21.2 pg 389
+    emitBytes(opcode, globalVarSlot); // ch 21.2 pg 389
 }
 
 // Ch 24 pg 450
@@ -192,12 +193,17 @@ static void emitByte(uint8_t byte) {
     writeChunk(currentChunk(), byte, parser.previous.line);
 }
 
-static void emitBytes(uint8_t byte1, uint8_t byte2) {
+static void emitShort(short val) {
+    emitByte((val >> 8) & 0xff);
+    emitByte(val & 0xff);
+}
+
+static void emitBytes(OpCode byte1, uint8_t byte2) {
     emitByte(byte1);
     emitByte(byte2);
 }
 
-static int emitJump(uint8_t instruction) {
+static int emitJump(OpCode instruction) {
     emitByte(instruction);
     emitByte(0xff);
     emitByte(0xff);
@@ -260,21 +266,18 @@ static void patchJump(int offset) {
 // The main program is in a dummy function of TYPE_SCRIPT, any program code functions are TYPE_FUNCTION
 static void initCompiler(Compiler* compiler, FunctionType type) { 
     compiler->enclosing = current;  // link to parent instance ch 24.4.1 pg 448
-    compiler->function = NULL;
-    compiler->type = type;
-    
     compiler->localCount = 0;
     compiler->scopeDepth = 0;
     compiler->function = newFunction();  // pg 437
     compiler->type = type;
-
+    
     current = compiler;
     if (type != TYPE_SCRIPT) {
         current->function->name = copyString(parser.previous.start,
             parser.previous.length);
     }
 
-    // Reserve stack slot zero for VM internal use
+    // Reserve stack slot zero for VM internal use ch 24.2.1 pg 438
     Local* local = &current->locals[current->localCount++];
     local->depth = 0;
     local->name.start = "";  //  name is empty so user can't refer to it
@@ -353,7 +356,7 @@ static void expression() {
     parsePrecedence(PREC_ASSIGNMENT); 
 }
 
-static bool consumeInteger(char* message, int* outValue) {
+static void consumeInteger(char* message, int* outValue) {
     bool isNegative = match(TOKEN_MINUS);
     int value;
     consume(TOKEN_NUMBER, message);
@@ -362,8 +365,18 @@ static bool consumeInteger(char* message, int* outValue) {
     *outValue = isNegative ? -value : value;
 }
 
+// moved into array.c
+//int calculateArraySize(int dimensions, int lBounds[MAXARRAYDIMENSIONS], int uBounds[MAXARRAYDIMENSIONS]) {
+//    int varCount = 0;
+//    varCount = 1 + abs(uBounds[0] - lBounds[0]); // -5 to -3 = len 3  -3 to 2 = len 6   2 to 5 len 4
+//    for (int i = 1; i < dimensions; i++) {
+//        int dimCount = 1 + abs(uBounds[0] - lBounds[0]);
+//        varCount *= dimCount;
+//    }
+//    return varCount;
+//}
+
 #define MAXVARSINDECLARE 20
-#define MAXARRAYDIMENSIONS 3
 
 
 // 11/17/25 add support for multiple
@@ -374,14 +387,22 @@ static void varDeclaration() {
     // varSlot can be a slot in Globals if the declaration is outside a function
     //   in this case a OP_SET_GLOBAL is generated
     // or can be the slot on the local stack when declaring variables inside of a function
-    uint8_t varSlot = parseVariable("Expect variable name.");
+
+    // this will consume(TOKEN_IDENTIFIER, errorMessage);
+    // and we need it to set up a array version if this is an array!
+    OpCode vmDefineOpcode = OP_DEFINE_GLOBAL;
+    uint8_t varNameSlot = parseVariable("Expect variable name."); // gets us a slot for the constant name for this var
+    int dimensions = 0;
+    int lBounds[MAXARRAYDIMENSIONS], uBounds[MAXARRAYDIMENSIONS];
 
     // is this an array declaration?
     if (match(TOKEN_LEFT_PAREN)) {
-        int dimensions = 0;
-        int lBound, uBound;
-        bool hasUBound = false;
+        vmDefineOpcode = OP_DEFINE_GLOBAL_ARRAY;
+       
+        
         do {
+            int lBound, uBound = 0;
+            bool hasUBound = false;
             dimensions++;
             if (dimensions > MAXARRAYDIMENSIONS)
                 error("Can't define more than 3 array dimensions, sorry.");
@@ -400,13 +421,28 @@ static void varDeclaration() {
 
             // Process the array bound.
             // Need to store this as an extended attribute on the Value object.
+            if (hasUBound) {
+                lBounds[dimensions - 1] = lBound;
+                uBounds[dimensions - 1] = uBound;
+            }
+            else {
+                lBounds[dimensions - 1] = 1;
+                uBounds[dimensions - 1] = lBound;
+            }
+            
             
             
         } while (match(TOKEN_COMMA));
 
         consume(TOKEN_RIGHT_PAREN,
             "Expect ')' after array bounds.");
+        // Allocate memory for the Array
+        // Setup a struct that defines the array
+        // Set the lookup value in the Global Arrays dict to point to our array definition
+
     }
+
+    
 
 
     int numVariablesDefined = 0;
@@ -417,22 +453,49 @@ static void varDeclaration() {
     else {
         emitByte(OP_NIL);
     }
+
     // note that defineVariable will define a global; for a local it marks it as initialized
-    defineVariable(varSlot);
+    defineVariable(vmDefineOpcode, varNameSlot);
+
+    
+
+    if (vmDefineOpcode == OP_DEFINE_GLOBAL_ARRAY) {
+        int varCount = calculateArraySize(dimensions, lBounds, uBounds);
+
+        emitByte(dimensions); // provide the runtime with the # subscripts
+        emitShort(varCount);  // provide the runtime with count of Values needed 
+        
+        for (int i = 0; i < dimensions; i++) {
+            emitShort(lBounds[i]);
+            emitShort(uBounds[i]);
+        }
+
+        // TODO 11/21/25 - the bytecode should be self-sufficient
+        // do NOT want coupling to the compile time structures
+
+        // bytecode
+        //  OP_DEFINE_GLOBAL_ARRAY
+        //  # subscripts
+        //  2 byte short lowbound 1
+        //  2 byte short upbound 1
+        // repeat for additional subscripts
+        //  then next opCode
+    }
   
     // Are there more variables to declare?
+    // TODO oops can't declare arrays here yet !
     if (match(TOKEN_COMMA)) {
         do {
-            if (numVariablesDefined > MAXVARSINDECLARE)
+            if (numVariablesDefined++ > MAXVARSINDECLARE)
                 error("Can't define more than 20 variables at a time, sorry.");
-            varSlot = parseVariable("Expect variable name.");
+            varNameSlot = parseVariable("Expect variable name.");
             if (match(TOKEN_EQUAL)) {
                 expression();
             }
             else {
                 emitByte(OP_NIL);
             }
-            defineVariable(varSlot);
+            defineVariable(OP_DEFINE_GLOBAL, varNameSlot);
         } while (match(TOKEN_COMMA));
     }
 
@@ -606,8 +669,8 @@ static void function(FunctionType type) {
             if (current->function->arity > 255) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
-            uint8_t constant = parseVariable("Expect parameter name.");
-            defineVariable(constant);
+            uint8_t constantSlotForVarName = parseVariable("Expect parameter name.");
+            defineVariable(OP_DEFINE_GLOBAL, constantSlotForVarName);
         } while (match(TOKEN_COMMA));
     }
 
@@ -625,10 +688,10 @@ static void function(FunctionType type) {
 
 // added in 24.4 pg 446
 static void funDeclaration() {
-    uint8_t global = parseVariable("Expect function name.");
+    uint8_t constantsSlotForFunName = parseVariable("Expect function name.");
     markInitialized();
     function(TYPE_FUNCTION);
-    defineVariable(global);
+    defineVariable(OP_DEFINE_GLOBAL, constantsSlotForFunName);
 }
 
 // added in 21.1.1 pg 384
@@ -826,7 +889,7 @@ static bool parseIntSlice(const char* ptr, int len, int* outValue) {
     }
 
     for (; i < len; i++) {
-        if (!isdigit((unsigned char)ptr[i])) return false;
+        if (!isDigit((unsigned char)ptr[i])) return false;
         value = value * 10 + (ptr[i] - '0');
     }
 
@@ -866,43 +929,59 @@ static void string(bool canAssign) {
 //}
 
 // for assignment logic - ch 22.4 pg 407 local vars
-static void namedVariable(Token name, bool canAssign) {
-    uint8_t getOp, setOp;
-    int arg = resolveLocal(current, &name);
-    if (arg != -1) {
-        getOp = OP_GET_LOCAL;
-        setOp = OP_SET_LOCAL;
-    }
-    //else if ((arg = resolveUpvalue(current, &name)) != -1) {
-    //    getOp = OP_GET_UPVALUE;
-    //    setOp = OP_SET_UPVALUE;
-    //}
-    else {
+static void namedVariable(Token name, bool canAssign, int numArraySubscripts) {
+    OpCode getOp, setOp;
+    int arg = -1;
+    if (numArraySubscripts != 0) {
+        // TODO lookup the array definition to set arg
         arg = identifierConstant(&name);
-        getOp = OP_GET_GLOBAL;
-        setOp = OP_SET_GLOBAL;
+        getOp = OP_GET_GLOBAL_ARRAY;
+        setOp = OP_SET_GLOBAL_ARRAY;
+
+    }
+    else {
+        arg = resolveLocal(current, &name);
+        if (arg != -1) {
+            getOp = OP_GET_LOCAL;
+            setOp = OP_SET_LOCAL;
+        }
+        else {
+            arg = identifierConstant(&name);
+            getOp = OP_GET_GLOBAL;
+            setOp = OP_SET_GLOBAL;
+        }
     }
 
     if (canAssign && match(TOKEN_EQUAL)) { //pg 408
-        expression();
+        uint8_t bytecode_start_rhs_ip = current->function->chunk.count;  // save off the start of the assignment
+        printf("ip (bytecode offset) for start of the rhs is %d\n", current->function->chunk.count);
+        expression(); // This is the RH side of the assignment
         emitBytes(setOp, (uint8_t)arg);
+        if (setOp == OP_SET_GLOBAL_ARRAY) {
+            // put the ip of the opcode that starts the RHS into the bytecode
+            emitByte((uint8_t)bytecode_start_rhs_ip);
+        }
     }
     else {
         emitBytes(getOp, (uint8_t)arg);
+    }
+
+    if (numArraySubscripts != 0) { // TODO  must always have subscripts for OP_GET_GLOBAL_ARRAY! assert this!
+        emitByte((uint8_t)numArraySubscripts);
     }
 }
 
 // added in Ch 21.3 pg 391; canAssign added on pg 395
 static void variable(bool canAssign) {
-    bool arrayReference = false;
+    int numArraySubscripts = 0;
     Token variableToken = parser.previous;
     // Is the variable subscripted?  if so it is an array reference
     
     if (match(TOKEN_LEFT_PAREN)) {
-        int dimensions = 0;
+        
         do {
-            dimensions++;
-            if (dimensions > MAXARRAYDIMENSIONS)
+            numArraySubscripts++;
+            if (numArraySubscripts > MAXARRAYDIMENSIONS)
                 error("Can't access more than 3 array dimensions, sorry.");
 
             // the subscript can be an integer (negative is allowed)
@@ -913,21 +992,25 @@ static void variable(bool canAssign) {
             if (match(TOKEN_STAR)) {
                 emitConstant(ARRAY_STAR_VAL);
             }
+            else if (match(TOKEN_COLON)) {
+                // e.g. A(1:N)
+                error("Not implemented yet - support for A(1:3) or even A(3:1) for A(3) then A(2) then A(1). Sorry.");
+            }
             else {
                 expression();
             }
             
-            printf("Array reference has %d dimensions\n", dimensions);
 
         } while (match(TOKEN_COMMA));
+
+        printf("Array reference has %d dimensions\n", numArraySubscripts);
+        
         consume(TOKEN_RIGHT_PAREN,
             "Expect ')' after array reference.");
     }
 
-    namedVariable(variableToken, canAssign);
-    //if (arrayReference) {
-    //    // TODO create VM operation that points to array, and has # of subscripts to POP off stack 
-    //}
+    namedVariable(variableToken, canAssign, numArraySubscripts);
+   
 }
 
 

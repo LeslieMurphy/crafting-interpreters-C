@@ -128,6 +128,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="array.c" />
     <ClCompile Include="chunk.c" />
     <ClCompile Include="compiler.c" />
     <ClCompile Include="debug.c" />
@@ -142,6 +143,7 @@
     <ClCompile Include="vm.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="array.h" />
     <ClInclude Include="chunk.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="compiler.h" />

@@ -35,4 +35,6 @@ typedef struct {
 void initScanner(const char* source);
 
 Token scanToken();
+
+bool isDigit(char c);
 #endif

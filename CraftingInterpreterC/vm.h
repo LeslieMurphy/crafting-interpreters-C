@@ -6,6 +6,7 @@
 #include "value.h"
 #include "object.h"
 #include "hashtable.h"
+#include "array.h"
 
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
@@ -29,14 +30,18 @@ typedef struct {
 
 	Value stack[STACK_MAX];
 	Value* stackTop;
+	
+	Table strings; // added Ch 20.5 pg 377 for string interning - hashset of unique strings 
 	Table globals; // added Ch 21.2 pg 390 for global vars
-	Table strings; // added Ch 20.5 pg 377 for string interning
+	Table globalArrayVars; // Dynamically bound - used to lookup the array definition
 	Obj* objects; //  added in Ch 19.5 page 352 as starting point for eventual GC implementation
 
 	long long instructionCount;
 	long long pushCount;
 	long long popCount;
 
+	ArrayVariables arrayVarList;
+	
 } VM;
 
 void initVM();
