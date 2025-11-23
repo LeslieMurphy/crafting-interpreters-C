@@ -7,6 +7,15 @@
 // Ch 19.2 pg 343 Struct Inheritance
 typedef struct Obj Obj;
 
+/*
+struct ObjString {
+    Obj obj;
+    int length;
+    char* chars;
+    uint32_t hash; 
+};
+*/
+
 typedef struct ObjString ObjString;
 
 #ifdef NAN_BOXING

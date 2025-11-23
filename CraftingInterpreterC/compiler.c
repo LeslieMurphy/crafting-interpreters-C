@@ -22,7 +22,10 @@ typedef struct ClassCompiler {
 } ClassCompiler;
 */
 
+#define MAX_GLOBAL_FUNCTIONS 5
 
+static ObjFunction globalFunctions[MAX_GLOBAL_FUNCTIONS];  // todo is the ObjString pointer valid at time of use?
+int globalFunctionCount;
 
 Parser parser;
 Compiler* current = NULL;
@@ -661,6 +664,10 @@ static void function(FunctionType type) {
     initCompiler(&compiler, type);
     beginScope(); // [no-end-scope]
 
+    if (globalFunctionCount < MAX_GLOBAL_FUNCTIONS) {
+        globalFunctions[globalFunctionCount++].name = current->function->name;
+    }
+
     consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
     
     if (!check(TOKEN_RIGHT_PAREN)) {
@@ -680,6 +687,10 @@ static void function(FunctionType type) {
 
     ObjFunction* function = endCompiler();
     emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
+    //if (globalFunctionCount < MAX_GLOBAL_FUNCTIONS) {
+    //    globalFunctions[globalFunctionCount++].name = function->name;
+    //}
+    //
     // emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
 
     //> parameters
@@ -692,6 +703,7 @@ static void funDeclaration() {
     markInitialized();
     function(TYPE_FUNCTION);
     defineVariable(OP_DEFINE_GLOBAL, constantsSlotForFunName);
+    
 }
 
 // added in 21.1.1 pg 384
@@ -975,9 +987,40 @@ static void namedVariable(Token name, bool canAssign, int numArraySubscripts) {
 static void variable(bool canAssign) {
     int numArraySubscripts = 0;
     Token variableToken = parser.previous;
-    // Is the variable subscripted?  if so it is an array reference
+    // Is the variable subscripted?  if so it could be an array reference
+    // OR it can be a function call!
     
-    if (match(TOKEN_LEFT_PAREN)) {
+    // see if the variableToken refers to a function.
+    //char* tokenend = variableToken.start + variableToken.length;
+    //char save = *tokenend;
+    //*tokenend = '\0'; // null terminate temp
+
+
+    // globalFunctions[globalFunctionCount++].name = function->name;
+
+    // TODO native functions are registered at runtime in the VM
+    //  the compiler needs to know about them too!  defineNative .. Clock
+
+    
+    bool varIsFunction = false;
+
+    if (variableToken.length == 5 && memcmp("clock", variableToken.start, 5) == 0) {
+        varIsFunction = true;
+    }
+
+    for (int i = 0; i < MAX_GLOBAL_FUNCTIONS && !varIsFunction && globalFunctions[i].name != NULL; i++) {
+        if (variableToken.length == globalFunctions[i].name->length &&
+            memcmp(globalFunctions[i].name->chars, variableToken.start, variableToken.length) == 0) {
+            varIsFunction = true;
+        }
+    }
+
+//    *tokenend = save; // restore char
+
+    // if not a function, see if its an array
+    if (!varIsFunction && match(TOKEN_LEFT_PAREN)) {
+
+       
         
         do {
             numArraySubscripts++;
@@ -986,11 +1029,18 @@ static void variable(bool canAssign) {
 
             // the subscript can be an integer (negative is allowed)
             // or any expression that yields an integer
+            // 
+            // Cross sectioning - need to generalize this 
+            // Instead of the kludge workaround, emit a for loop for cross sectioning
+            // 
+            // 
+            // 
             // or the special case of a '*' which means all array elements
             //   .e.g. A(*) or B(*,*) or MATRIX(5,*) etc.
+            ///  B(*) = .N will set the values to 1,2,3,4,5 in the array
             
             if (match(TOKEN_STAR)) {
-                emitConstant(ARRAY_STAR_VAL);
+                emitConstant(ARRAY_STAR_VAL);  
             }
             else if (match(TOKEN_COLON)) {
                 // e.g. A(1:N)
@@ -1008,6 +1058,7 @@ static void variable(bool canAssign) {
         consume(TOKEN_RIGHT_PAREN,
             "Expect ')' after array reference.");
     }
+    
 
     namedVariable(variableToken, canAssign, numArraySubscripts);
    
@@ -1062,6 +1113,12 @@ static void parsePrecedence(Precedence precedence) {
 // bool compile(const char* source, Chunk * chunk) { prior to ch 24
 ObjFunction* compile(const char* source) {
 	initScanner(source);
+
+    globalFunctionCount = 0;
+    for (int i = 0; i < MAX_GLOBAL_FUNCTIONS; i++) {
+        globalFunctions[i].name = NULL;
+    }
+    
     Compiler compiler;
     initCompiler(&compiler, TYPE_SCRIPT); // pg 437
     
@@ -1092,3 +1149,8 @@ ObjFunction* compile(const char* source) {
 
 #undef MAXVARSINDECLARE
 #undef MAXARRAYDIMENSIONS
+#undef MAX_GLOBAL_FUNCTIONS
+
+
+#define MAX_GLOBAL_FUNCTIONS 5
+//////

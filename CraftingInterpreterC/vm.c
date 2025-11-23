@@ -309,38 +309,37 @@ double randomNumber(double a, double b) {
 
 static Value valueMemoize;
 
-static InterpretResult run() {
-	
-	valueMemoize.type = VAL_NIL;
-
-	CallFrame* frame = &vm.frames[vm.frameCount - 1];  // Added Ch 24
 #define READ_BYTE() (*frame->ip++)
 #define READ_CONSTANT() \
 	(frame->function->chunk.constants.values[READ_BYTE()])
-//#define READ_CONSTANT() \
-//    (frame->closure->function->chunk.constants.values[READ_BYTE()])
 #define READ_SHORT() \
     (frame->ip += 2, \
     (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 
-//#define READ_BYTE() (*vm.ip++)
-//#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
-//#define READ_SHORT() \
-//    (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
 
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
-	printf("\nExecution VM trace:\n");
-	debugPrintTable(&vm.strings, "Strings", true);
-	printf("\n");
-	debugPrintTable(&vm.globals, "Globals", false);
-	printf("\n");
+static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, int endIp, bool infiniteLoop) {
+	// normal case is a forever loop - ends on OP_RETURN
+	// special case is a recursive call to reprocess a single RHS 
+	// so we can yield a new value on each loop
 
-	for (;;) {
+	uint8_t* saved_ip;
+	uint8_t* end_ip_ptr = NULL;
+
+	if (!infiniteLoop) {
+		// we are running a subset of the code
+		saved_ip = frame->ip;
+		frame->ip = frame->function->chunk.code;  // beginning of the entire bytecode for this function
+		frame->ip += startIp;
+		end_ip_ptr = frame->ip + endIp;
+	}
+
+	// the interpreter loop  - normally this is infinite and will end with the OP_RETURN opcode
+	for (; infiniteLoop || frame->ip <= end_ip_ptr;) {
 		vm.instructionCount++;
 
-		/*disassembleInstruction(&frame->function->chunk,
-			(int)(frame->ip - frame->function->chunk.code));*/
+
 
 #ifdef DEBUG_TRACE_EXECUTION
 		printf("** Stack trace ***\n");
@@ -353,9 +352,6 @@ static InterpretResult run() {
 		printf("\n");
 		disassembleInstruction(&frame->function->chunk,
 			(int)(frame->ip - frame->function->chunk.code));
-		/* prior to Ch 24
-		disassembleInstruction(vm.chunk,
-			(int)(vm.ip - vm.chunk->code));*/
 #endif
 		uint8_t instruction;
 		switch (instruction = READ_BYTE()) {
@@ -617,12 +613,12 @@ static InterpretResult run() {
  */
 			ArrayVariable* varDefn;
 			// Value arrayDefinition = { VAL_ARRAY_REF , .as.obj = varDefn };
-			varDefn = (ArrayVariable*) value.as.obj;
+			varDefn = (ArrayVariable*)value.as.obj;
 			int dimensions = varDefn->dimensions;
 
 			// int idOfArrayVar = READ_BYTE();
 			int subscriptCount = READ_BYTE();
-			
+
 			// TODO the subscript can be * or a range such as 5:10
 
 			if (subscriptCount == 0) {
@@ -634,7 +630,7 @@ static InterpretResult run() {
 				runtimeError("array subscripts do not match array dimensions");
 				return INTERPRET_RUNTIME_ERROR;
 			}
-			
+
 			Value subscripts[MAXARRAYDIMENSIONS];
 
 			for (int i = 0; i < subscriptCount; i++) {
@@ -651,7 +647,7 @@ static InterpretResult run() {
 			}
 
 			// varDefn->arrayValues[2] = fake;
-			
+
 			//value = varDefn->arrayValues[(int) (subscripts[0].as.number - 1) ];  // TODO fix this!
 			//push(value);
 
@@ -665,30 +661,30 @@ static InterpretResult run() {
 				return INTERPRET_RUNTIME_ERROR;
 			}
 			push(*valuePtr);
-			
+
 
 
 			// TODO the bounds are offsets so subtract 1
 			// TODO multiple dimensions?
 			// TODO * get would need to return an array slice
 
-		
-			
 
-			
-			
+
+
+
+
 			//if (!tableGet(&vm.globals, name, &value)) {
 			//	runtimeError("Undefined variable '%s'.", name->chars);
 			//	return INTERPRET_RUNTIME_ERROR;
 			//}
-			
+
 			break;
 
 		}
 
 		case OP_SET_GLOBAL_ARRAY: { // Ch 21.4 pg 393
 			// 0004    | OP_SET_GLOBAL_ARRAY    1 Subscripts=1
-			
+
 			// (frame->function->chunk.constants.values[READ_BYTE()])
 
 			// for globalArrayVars the Value will not be the scalar value
@@ -722,7 +718,7 @@ static InterpretResult run() {
 
 			ArrayVariable* varDefn = (ArrayVariable*)value.as.obj;
 			int dimensions = varDefn->dimensions;
-						
+
 			uint8_t start_rhs_ip = READ_BYTE(); // new so we can handle star assigment e.g. var a(10); a(*) = 1?100;
 			int subscriptCount = READ_BYTE();
 
@@ -733,7 +729,7 @@ static InterpretResult run() {
 
 			printf("there are %d subscripts.  Rhs ip start is %d\n", subscriptCount, start_rhs_ip);
 
-			
+
 			if (subscriptCount != dimensions) {
 				runtimeError("array subscripts do not match array dimensions");
 				return INTERPRET_RUNTIME_ERROR;
@@ -757,7 +753,7 @@ static InterpretResult run() {
 				return INTERPRET_RUNTIME_ERROR;
 			}
 
-			
+
 			// we have trouble here because we need to pop the subscripts but the very top of stack is RH side!
 
 			// TODO optimize so we just do the pops no peeks
@@ -768,7 +764,7 @@ static InterpretResult run() {
 			break;
 		}
 
-	
+
 
 		case OP_DEFINE_GLOBAL: { // ch 21.2
 			ObjString* name = READ_STRING();
@@ -778,7 +774,7 @@ static InterpretResult run() {
 			break;
 		}
 
-		case OP_DEFINE_GLOBAL_ARRAY: { 
+		case OP_DEFINE_GLOBAL_ARRAY: {
 			ObjString* name = READ_STRING();
 			// Initializer not present set each Array element to nil?
 			Value rhs = peek(0); // TODO handle an initializer on an array.  
@@ -788,14 +784,14 @@ static InterpretResult run() {
 			int subscriptCount = READ_BYTE();
 			int varCount = READ_SHORT(); // TODO support larger arrays
 			printf("Global var %s with subscript count %d total variable count %d\n", name->chars, subscriptCount, varCount);
-			
-			
-			
+
+
+
 			// TODO get the bounds and each bound dimensions from our bytecode 
-			
+
 			//ArrayVariable* varDefn = allocateArrayVar(bounds);
 			//vm.arrayVarList.arrayVars[vm.arrayVarList.arrayVarCount] = varDefn;
-			
+
 			ArrayVariable* varDefn = allocateNewArrayVar(&vm.arrayVarList, subscriptCount, varCount);
 			varDefn->variableName = name->chars;
 			varDefn->dimensions = subscriptCount;
@@ -806,19 +802,19 @@ static InterpretResult run() {
 				varDefn->bounds[i].lBound = lbound;
 				varDefn->bounds[i].uBound = ubound;
 			}
-			
+
 
 
 			Value arrayDefinition = { VAL_ARRAY_REF , .as.obj = varDefn };
 			// the lookup of the global variable name for the array will get us a pointer back to the definition
-			tableSet(&vm.globalArrayVars, name, arrayDefinition); 
+			tableSet(&vm.globalArrayVars, name, arrayDefinition);
 
 			// temp code
 			Value fake2 = { VAL_NUMBER, .as.number = 123 };
 			varDefn->arrayValues[2] = fake2;
 			Value fake3 = { VAL_NUMBER, .as.number = 456 };
 			varDefn->arrayValues[3] = fake3;
-				// varDefn->arrayValues[2];
+			// varDefn->arrayValues[2];
 			pop();
 			break;
 		}
@@ -826,7 +822,7 @@ static InterpretResult run() {
 
 
 
-							 // Ch 22.4.1 pg 409 
+								   // Ch 22.4.1 pg 409 
 		case OP_GET_LOCAL: {
 			uint8_t slot = READ_BYTE();
 			//push(vm.stack[slot]); // copy the variable from deeper in the stack onto the top for use
@@ -854,9 +850,9 @@ static InterpretResult run() {
 			break;
 		}
 		case OP_GREATER:  BINARY_OP(BOOL_VAL, > ); break;
-		//case OP_LESS:     BINARY_OP(BOOL_VAL, < ); break; // unoptimized
-		
-		case OP_LESS:     {
+			//case OP_LESS:     BINARY_OP(BOOL_VAL, < ); break; // unoptimized
+
+		case OP_LESS: {
 			if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
 				double b = ((peek(0)).as.number);
 				double a = ((peek(1)).as.number);
@@ -885,10 +881,29 @@ static InterpretResult run() {
 			}
 			break;
 		}
-					
+
 
 		}
-	}
+	} // end for loop
+
+}
+
+static InterpretResult main_run() {
+	
+	valueMemoize.type = VAL_NIL;
+
+	CallFrame* frame = &vm.frames[vm.frameCount - 1];  // Added Ch 24
+
+	printf("\nExecution VM trace:\n");
+	debugPrintTable(&vm.strings, "Strings", true);
+	printf("\n");
+	debugPrintTable(&vm.globals, "Globals", false);
+	printf("\n");
+
+	//interpret_bytecode_loop(CallFrame * frame, int startIp, int endIp, bool infiniteLoop) {
+	return interpret_bytecode_loop(frame, 0, 0, true);  // run the interpreter
+
+		
 }
 
 /* used for initial ch 15 - hardcoded bytecode chunks 
@@ -915,7 +930,7 @@ InterpretResult interpret(const char* source) {
 
 	call(function, 0);  // pg 453 - set up first frame for top-level code.  Needed to remove code from pg 445
 
-	return run();
+	return main_run();
 
 	//ObjClosure* closure = newClosure(function);
 	//pop();
