@@ -82,11 +82,6 @@ void initVM() {
 	initTable(&vm.globals); // ch 21.2 for global vars pg 390
 	initTable(&vm.globalArrayVars); 
 	
-	//typedef struct {
-	//	ArrayVariable* arrayVars[MAXARRAYVARIABLES];
-	//	int arrayVarCount;
-	//} ArrayVariables;
-
 	vm.arrayVarList.arrayVarCount = 0;
 	
 	defineNative("clock", clockNative);
@@ -96,18 +91,6 @@ void initVM() {
 	vm.popCount = 0;
 
 	srand((unsigned int)time(NULL)); // seed rng
-
-	//// GC
-	//vm.bytesAllocated = 0;
-	//vm.nextGC = 1024 * 1024;
-	//vm.grayCount = 0;
-	//vm.grayCapacity = 0;
-	//vm.grayStack = NULL;
-	
-	//// initString
-	//vm.initString = NULL;
-	//vm.initString = copyString("init", 4);
-
 }
 
 void freeVM() {
@@ -126,6 +109,10 @@ void freeVM() {
 void push(Value value) {
 	vm.pushCount++;
 	*vm.stackTop = value;
+	//printf("PUSH stackTop=%p, value type=%d\n", (void*)vm.stackTop, value.type);
+	//if (value.type == VAL_NUMBER)
+	//	printf("Number value is %f\n", value.as.number);
+
 	// in debugger we can use a watch ==> (ObjString*) value.as.obj
 	/*if (IS_OBJ(value)) {
 		Obj* o = value.as.obj;
@@ -146,6 +133,12 @@ Value pop() {
 	vm.stackTop--;
 	return *vm.stackTop;
 }
+
+static Value* peek_ptr(int distance) {
+	return &vm.stackTop[-1 - distance];
+}
+
+
 
 static Value peek(int distance) {
 	return vm.stackTop[-1 - distance];
@@ -168,6 +161,7 @@ static bool call(ObjFunction* function, int argCount) {
 	CallFrame* frame = &vm.frames[vm.frameCount++];
 	frame->function = function;
 	frame->ip = function->chunk.code;
+	frame->start_ip = function->chunk.code;
 
 	/*frame->closure = closure;
 	frame->ip = closure->function->chunk.code;*/
@@ -182,41 +176,6 @@ static bool callValue(Value callee, int argCount) {
 		switch (OBJ_TYPE(callee)) {
 		case OBJ_FUNCTION: 
 			return call(AS_FUNCTION(callee), argCount);
-
-		//case OBJ_BOUND_METHOD: {
-		//	ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
-		//	vm.stackTop[-argCount - 1] = bound->receiver;
-		//	return call(bound->method, argCount);
-		//}
-		//case OBJ_CLASS: {
-		//	ObjClass* klass = AS_CLASS(callee);
-		//	vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
-		//	//> Methods and Initializers call-init
-		//	Value initializer;
-		//	if (tableGet(&klass->methods, vm.initString,
-		//		&initializer)) {
-		//		return call(AS_CLOSURE(initializer), argCount);
-		//		//> no-init-arity-error
-		//	}
-		//	else if (argCount != 0) {
-		//		runtimeError("Expected 0 arguments but got %d.",
-		//			argCount);
-		//		return false;
-		//		//< no-init-arity-error
-		//	}
-		//	//< Methods and Initializers call-init
-		//	return true;
-		//}
-		//			  //< Classes and Instances call-class
-		//			  //> Closures call-value-closure
-		//case OBJ_CLOSURE:
-		//	return call(AS_CLOSURE(callee), argCount);
-		//	//< Closures call-value-closure
-		//	/* Calls and Functions call-value < Closures call-value-closure
-		//		  case OBJ_FUNCTION: // [switch]
-		//			return call(AS_FUNCTION(callee), argCount);
-		//	*/
-		//	//> call-native
 		case OBJ_NATIVE: {
 			NativeFn native = AS_NATIVE(callee);
 			Value result = native(argCount, vm.stackTop - argCount);
@@ -319,6 +278,11 @@ static Value valueMemoize;
 
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
+Value* get_value_for_set_array(ValueContext* ctx) {
+	interpret_bytecode_loop(ctx->frame, ctx->start, ctx->end, false);
+	return peek_ptr(0);
+}
+
 static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, int endIp, bool infiniteLoop) {
 	// normal case is a forever loop - ends on OP_RETURN
 	// special case is a recursive call to reprocess a single RHS 
@@ -330,13 +294,13 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 	if (!infiniteLoop) {
 		// we are running a subset of the code
 		saved_ip = frame->ip;
-		frame->ip = frame->function->chunk.code;  // beginning of the entire bytecode for this function
-		frame->ip += startIp;
-		end_ip_ptr = frame->ip + endIp;
+		// frame->start_ip is beginning of the entire bytecode for this function (also should be start of the chunk)
+		frame->ip = frame->start_ip + startIp;  // beginning of the bytecode we want to run
+		end_ip_ptr = frame->start_ip + endIp;
 	}
 
 	// the interpreter loop  - normally this is infinite and will end with the OP_RETURN opcode
-	for (; infiniteLoop || frame->ip <= end_ip_ptr;) {
+	for (; infiniteLoop || frame->ip < end_ip_ptr;) {
 		vm.instructionCount++;
 
 
@@ -551,28 +515,7 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 
 		case OP_GET_GLOBAL: { // ch 21.3
 			ObjString* name = READ_STRING();
-			//if (strcmp(name->chars, "fib") == 0) {
-			//	if (valueMemoize.type != VAL_NIL) {
-			//		// printf("using fib memoize for %s\n", name->chars);
-			//		push(valueMemoize);
-			//		break;
-			//	}
-			//	else {
-			//		// printf("save fib memoize for %s\n", name->chars);
-			//		Value value;
-			//		if (!tableGet(&vm.globals, name, &value)) {
-			//			runtimeError("Undefined variable '%s'.", name->chars);
-			//			return INTERPRET_RUNTIME_ERROR;
-			//		}
-			//		push(value);
-			//		valueMemoize = value;
-			//		break;
-			//	}
-			//	
-			//}
-			//else {
-
-			/* the real code! */
+			
 			// printf("get global for %s\n", name->chars);
 			Value value;
 			if (!tableGet(&vm.globals, name, &value)) {
@@ -598,19 +541,12 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 			ObjString* name = READ_STRING();
 			Value value = NIL_VAL;
 
-			printf("get global array for %s\n", name->chars);
+			// printf("get global array for %s\n", name->chars);
 			if (!tableGet(&vm.globalArrayVars, name, &value)) {
 				runtimeError("Undefined variable '%s'.", name->chars);
 				return INTERPRET_RUNTIME_ERROR;
 			}
 
-			/*
-			TODO lookup the name in the global strings
-// get the ptr to the definition
-// Confirm subscripts match
-// index into the vars and get the value
- handle *
- */
 			ArrayVariable* varDefn;
 			// Value arrayDefinition = { VAL_ARRAY_REF , .as.obj = varDefn };
 			varDefn = (ArrayVariable*)value.as.obj;
@@ -619,7 +555,8 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 			// int idOfArrayVar = READ_BYTE();
 			int subscriptCount = READ_BYTE();
 
-			// TODO the subscript can be * or a range such as 5:10
+			// TODO the subscript can be * (partially supported)
+			//      or a range such as 5:10
 
 			if (subscriptCount == 0) {
 				runtimeError("array var ref without any subscripts");
@@ -636,10 +573,10 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 			for (int i = 0; i < subscriptCount; i++) {
 				Value temp = peek(i - i);
 				subscripts[i] = peek(i - i);
-				printf("Subscript % d is ", i);
-				printValue(subscripts[i]);
+				// printf("Subscript % d is ", i);
+				// printValue(subscripts[i]);
 			}
-			printf("\n");
+			// printf("\n");
 
 			// TODO optimize so we just do the pops no peeks
 			for (int i = 0; i < subscriptCount; i++) {
@@ -695,7 +632,7 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 			ObjString* name = READ_STRING();
 			Value value = NIL_VAL;
 
-			printf("set global array for %s\n", name->chars);
+			// printf("set global array for %s\n", name->chars);
 			Value rhs = peek(0);
 
 			// For regular globals, the vm.globals is a dynamic lookup to an entry, and we simply set its Value to the rhs contents
@@ -727,7 +664,7 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 				return INTERPRET_RUNTIME_ERROR;
 			}
 
-			printf("there are %d subscripts.  Rhs ip start is %d\n", subscriptCount, start_rhs_ip);
+			// printf("there are %d subscripts.  Rhs ip start is %d\n", subscriptCount, start_rhs_ip);
 
 
 			if (subscriptCount != dimensions) {
@@ -739,27 +676,45 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 
 			for (int i = 0; i < subscriptCount; i++) {
 				subscripts[i] = peek(subscriptCount - i);
-				printf("Subscript % d is ", i);
-				printValue(subscripts[i]);
-				printf("\n");
+				//printf("Subscript % d is ", i); printValue(subscripts[i]); printf("\n");
+			}
+			for (int i = 0; i < subscriptCount; i++) {
+				pop();
 			}
 
+			int currentInstruction = frame_ip - frame->start_ip - 1; // this should be the OP_SET_GLOBAL_ARRAY opcode
 
-			//varDefn->arrayValues[(int)(subscripts[0].as.number - 1)] = rhs;  // TODO fix this!  hardcoded to first subscript
+			ValueContext ctx = {
+				.frame = frame,
+				.start = start_rhs_ip,
+				.end = currentInstruction
+			};
+
+
+			//varDefn->arrayValues[(int)(subscripts[0].as.number - 1)] = rhs;  // test - hardcoded to first subscript
 			char err_buffer[200];
-			bool success = setArrayValue(varDefn, &rhs, &subscripts, &err_buffer, sizeof(err_buffer));
+			// bool success = setArrayValue(varDefn, &rhs, &subscripts, &err_buffer, sizeof(err_buffer));
+			uint8_t* saved_ip = frame->ip;
+			
+			bool success = setArrayValue(varDefn, get_value_for_set_array, &ctx, &subscripts, &err_buffer, sizeof(err_buffer));
+			
+
+			saved_ip = frame->ip = saved_ip;  // resume bytecode interpretation
+
 			if (!success) {
 				runtimeError(err_buffer);
 				return INTERPRET_RUNTIME_ERROR;
 			}
 
+			// TEST RERUN the rhs !!!
+			//interpret_bytecode_loop(frame, start_rhs_ip, currentInstruction, false);
+			//Value newRhs = peek(0);
 
-			// we have trouble here because we need to pop the subscripts but the very top of stack is RH side!
 
-			// TODO optimize so we just do the pops no peeks
-			//for (int i = 0; i < subscriptCount; i++) {
-			//	pop();
-			//}
+			// the long term correct logic needs to instead generate a loop at Compiler time
+			//    to process the cross-sectioning
+			//    var x(5); x(*) = 10?100; 
+			//    should generate ==> for (int compilerTemp = 0; compilerTemp < 5; compilerTemp++) {x(compilerTemp) = 10?100;}
 
 			break;
 		}
@@ -809,12 +764,13 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 			// the lookup of the global variable name for the array will get us a pointer back to the definition
 			tableSet(&vm.globalArrayVars, name, arrayDefinition);
 
-			// temp code
+			/* temp test code to assign values into array
 			Value fake2 = { VAL_NUMBER, .as.number = 123 };
 			varDefn->arrayValues[2] = fake2;
 			Value fake3 = { VAL_NUMBER, .as.number = 456 };
 			varDefn->arrayValues[3] = fake3;
-			// varDefn->arrayValues[2];
+			*/ 
+			
 			pop();
 			break;
 		}
@@ -849,9 +805,25 @@ static InterpretResult interpret_bytecode_loop(CallFrame* frame, int startIp, in
 			push(BOOL_VAL(valuesEqual(a, b)));
 			break;
 		}
-		case OP_GREATER:  BINARY_OP(BOOL_VAL, > ); break;
-			//case OP_LESS:     BINARY_OP(BOOL_VAL, < ); break; // unoptimized
+		// case OP_GREATER:  BINARY_OP(BOOL_VAL, > ); break; // unoptimized
+		case OP_GREATER: {
+			if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+				double b = ((peek(0)).as.number);
+				double a = ((peek(1)).as.number);
+				discardMultipleItemsFromStack(1);
+				(*(vm.stackTop - 1)).as.boolean = a > b;
+				(*(vm.stackTop - 1)).type = VAL_BOOL;  // turn the number on the stack into a Bool in place
+			}
+			else {
+				runtimeError(
+					"Operands for greater than must be two numbers.");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			break;
+		}
+		
 
+		//case OP_LESS:     BINARY_OP(BOOL_VAL, < ); break; // unoptimized
 		case OP_LESS: {
 			if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
 				double b = ((peek(0)).as.number);
@@ -892,7 +864,7 @@ static InterpretResult main_run() {
 	
 	valueMemoize.type = VAL_NIL;
 
-	CallFrame* frame = &vm.frames[vm.frameCount - 1];  // Added Ch 24
+	CallFrame* frame = &vm.frames[vm.frameCount - 1];  // Added Ch 24 
 
 	printf("\nExecution VM trace:\n");
 	debugPrintTable(&vm.strings, "Strings", true);
@@ -930,7 +902,15 @@ InterpretResult interpret(const char* source) {
 
 	call(function, 0);  // pg 453 - set up first frame for top-level code.  Needed to remove code from pg 445
 
-	return main_run();
+	clock_t start_time = clock();
+	InterpretResult r = main_run();
+	clock_t end_time = clock();
+
+	double elapsed = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+
+	printf("\n EXECUTION TIME %-9.3f SECONDS\n", elapsed);
+
+	return r;
 
 	//ObjClosure* closure = newClosure(function);
 	//pop();
@@ -969,4 +949,4 @@ InterpretResult interpret(const char* source) {
 #undef READ_CONSTANT
 #undef READ_SHORT
 #undef READ_STRING
-#undef BINARY_OP//////////////////////////
+#undef BINARY_OP////////////////////////////////

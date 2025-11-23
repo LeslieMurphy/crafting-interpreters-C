@@ -1,0 +1,24 @@
+// execution time debug is .004 seconds.  ACM article from 1969 for IITRAN took 1.4 seconds to compile, 2.1 seconds to execute
+var arr(0:50);
+arr(*) = 1?1000;
+var n = 50;
+var i, j, temp;
+
+var n = 51;
+for (var i = 0; i < n - 1; i = i + 1) {
+	// Inner loop for comparisons
+	for (var j = 0; j < n - i - 1; j = j + 1) {
+		if (arr(j) > arr(j + 1)) {
+			// Swap if out of order
+			temp = arr(j);
+			// print "Swap";
+			arr(j) = arr(j + 1);
+			arr(j + 1) = temp;
+		}
+	}
+}
+for (var i=0;i <= 50; i=i+1) {print arr(i); }
+
+
+// ERROR - NOT  IMPLEMENTED
+var arr(0:50) = 1?1000;

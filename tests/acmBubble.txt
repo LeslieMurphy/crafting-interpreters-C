@@ -1,0 +1,25 @@
+// ACM article from Oct 1969
+// Bubble Sort
+
+fun bubble{
+var i;
+var save;
+var x(0:50);
+var temp;
+
+x(*) = 0?50;
+i = 2;
+until (i > 50) {
+  save = i;
+  until (x(i) > x(i-1 and i != 2) {
+    temp = x(i);
+    x(i) = x(i-1);
+    x(i-1) = temp;
+	}
+   i = i + 1
+  }
+
+}
+
+}
+

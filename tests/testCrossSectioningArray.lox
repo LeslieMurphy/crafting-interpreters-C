@@ -1,0 +1,12 @@
+var array(10); array(*) = 8; for (var i=1;i <= 10; i=i+1) {print array(i); }
+
+var arr(0:5); arr(*) = 0?1000; for (var i=0;i <= 5; i=i+1) {print arr(i); }
+
+var array(10);
+array(*) = 8;
+for (var i=1;i <= 10; i=i+1) 
+  {
+    print i;
+    print array(i); 
+  }
+

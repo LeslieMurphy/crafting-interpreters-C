@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+Value pop();  // as defined in vm.h
+
 int calculateVarCount(int lbound, int ubound) {
 	return 1 + abs(ubound - lbound); // -5 to -3 = len 3  -3 to 2 = len 6   2 to 5 len 4
 }
@@ -58,19 +60,26 @@ Value* getArrayValue(ArrayVariable* varDefn, Value subscripts[], char* errbuf, s
 		snprintf(errbuf, errbuf_size, "Subscript value %d is not in array bounds between %d and %d", subscript1, bnd.lBound, bnd.uBound);
 		return NULL;
 	}
-	return &varDefn->arrayValues[(int)(subscripts[0].as.number - 1)];
+	int indexInArray = (int)(subscripts[0].as.number) - bnd.lBound;
+	return &varDefn->arrayValues[indexInArray];
 }
 
 
+//bool setArrayValue(ArrayVariable* varDefn, Value* newvalue, Value subscripts[], char* errbuf, size_t errbuf_size) {
+bool setArrayValue(ArrayVariable* varDefn, ValueProvider provider, ValueContext* ctx, Value subscripts[], char* errbuf, size_t errbuf_size) {
 
-// varDefn->arrayValues[(int)(subscripts[0].as.number - 1)] = rhs;  // TODO fix this!  hardcoded to first subscript
-
-bool setArrayValue(ArrayVariable* varDefn, Value* newvalue, Value subscripts[], char* errbuf, size_t errbuf_size) {
 	// only process subscript 1 for initial implementation
+
+	Value* newvalue;
+
 	if (subscripts[0].type == VAL_ARRAY_STAR) {
 		int boundsSubscript1 = calculateVarCount(varDefn->bounds[0].lBound, varDefn->bounds[0].uBound);
 		for (int i = 0; i < boundsSubscript1; i++) {
+			newvalue = provider(ctx); // get another value for each array element, in case its a random value or something else dynamic
+			
+			pop(); // pop the rhs we just regenerated
 			varDefn->arrayValues[i] = *newvalue;
+			
 		}
 
 	}
@@ -81,7 +90,16 @@ bool setArrayValue(ArrayVariable* varDefn, Value* newvalue, Value subscripts[], 
 			snprintf(errbuf, errbuf_size, "Subscript value %d is not in array bounds between %d and %d", subscript1, bnd.lBound, bnd.uBound);
 			return false;
 		}
-		varDefn->arrayValues[(int)(subscripts[0].as.number - 1)] = *newvalue;
+		// TODO in some cases we already have the RHS, don't need to go get it again
+		newvalue = provider(ctx); // runs the rhs to get us a value
+		
+		int indexInArray = (int)(subscripts[0].as.number) - bnd.lBound;
+		varDefn->arrayValues[indexInArray] =  *newvalue;
+
+		pop(); // pop the rhs we just regenerated -- if we use provider
+		
+		
+		
 	}
 
 	return true;

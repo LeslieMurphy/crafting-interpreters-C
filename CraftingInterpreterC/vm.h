@@ -14,10 +14,14 @@
 
 // Ch 24.3.3 provide call stack frames for functions
 // CallFrame is for a single ongoing function call - pg 442
-typedef struct {
+
+// was anonymous struct
+
+typedef struct CallFrame  {
 	ObjFunction* function;
 	// ObjClosure* closure;
 	uint8_t* ip;
+	uint8_t* start_ip; // TODO added but is this needed?  same as frame->function->chunk.code ?
 	Value* slots;
 } CallFrame;
 
